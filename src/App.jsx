@@ -532,9 +532,10 @@ export default function App() {
   // SM SESSION
   // ══════════════════════════════════════════════════════════════
   if (view === "smSession" && selectedTeam) {
-    const currentMembers = user
-      ? (myTeams[selectedTeam.id]?.members ? Object.keys(myTeams[selectedTeam.id].members) : [])
-      : (selectedTeam.members ? Object.keys(selectedTeam.members) : []);
+    // Always read from myTeams (Firebase live data) for both guest and account
+    const currentMembers = myTeams[selectedTeam.id]?.members
+      ? Object.keys(myTeams[selectedTeam.id].members)
+      : [];
 
     return (
       <div style={s.page}>
