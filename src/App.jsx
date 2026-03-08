@@ -44,7 +44,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
 
   // View
-  const [view, setView] = useState("role"); // role | smMode | smAuth | smDashboard | smSession | devJoin | devSession
+  const [view, setView] = useState("role"); // role | howTo | smMode | smAuth | smDashboard | smSession | devJoin | devSession
 
   // SM auth
   const [authMode, setAuthMode] = useState("login");
@@ -84,14 +84,16 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // ── Load SM teams ─────────────────────────────────────────────
+  // ── Load SM teams (both account and guest) ───────────────────
   useEffect(() => {
-    if (!user) return;
-    const unsub = onValue(ref(db, `teams/${user.uid}`), (snap) => {
+    if (view !== "smDashboard" && view !== "smSession") return;
+    const smId = user ? user.uid : `guest_${guestName.trim().replace(/\s/g, "_")}`;
+    if (!smId) return;
+    const unsub = onValue(ref(db, `teams/${smId}`), (snap) => {
       setMyTeams(snap.val() || {});
     });
     return () => unsub();
-  }, [user]);
+  }, [view, user, guestName]);
 
   // ── Load session ──────────────────────────────────────────────
   useEffect(() => {
@@ -174,11 +176,6 @@ export default function App() {
     // Also index by code for quick lookup
     await set(ref(db, `codes/${code}`), { teamId: newRef.key, smId });
     setNewTeamName("");
-
-    // For guest, update local state
-    if (!user) {
-      setMyTeams(prev => ({ ...prev, [newRef.key]: { name: newTeamName.trim(), members: {}, code } }));
-    }
   };
 
   const handleDeleteTeam = async (teamId, code) => {
@@ -296,6 +293,83 @@ export default function App() {
   );
 
   // ══════════════════════════════════════════════════════════════
+  // HOW TO USE
+  // ══════════════════════════════════════════════════════════════
+  if (view === "howTo") return (
+    <div style={s.page}>
+      <div style={{ ...s.card, maxWidth: 560, textAlign: "left" }}>
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <div style={{ fontSize: 40 }}>📖</div>
+          <h1 style={{ ...s.title, fontSize: 22 }}>How to Use Planning Poker</h1>
+        </div>
+
+        {/* SM Section */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 20 }}>🎯</span>
+            <h2 style={{ color: "#F0A500", fontSize: 15, margin: 0, fontWeight: 700 }}>Scrum Master</h2>
+          </div>
+          {[
+            { icon: "1️⃣", text: "Choose Guest (quick, no account) or Account (permanent teams)." },
+            { icon: "2️⃣", text: "Create a team and add your developers by name." },
+            { icon: "3️⃣", text: "Each team gets a 6-digit code like ABC123. Share this code with your team." },
+            { icon: "4️⃣", text: "Click on a team to open the session. Write the story to estimate and wait for votes." },
+            { icon: "5️⃣", text: "When everyone has voted, click Reveal Votes to see results." },
+            { icon: "6️⃣", text: "Click New Round to reset and start the next story." },
+          ].map(({ icon, text }) => (
+            <div key={icon} style={{ display: "flex", gap: 12, marginBottom: 10, alignItems: "flex-start" }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
+              <p style={{ color: "#aaa", fontSize: 13, margin: 0, lineHeight: 1.6 }}>{text}</p>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ height: 1, background: "#1e1e30", marginBottom: 24 }} />
+
+        {/* Dev Section */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 20 }}>👨‍💻</span>
+            <h2 style={{ color: "#45B7D1", fontSize: 15, margin: 0, fontWeight: 700 }}>Developer</h2>
+          </div>
+          {[
+            { icon: "1️⃣", text: "Get the 6-digit team code from your Scrum Master." },
+            { icon: "2️⃣", text: "Click Developer on the home screen, enter the code and hit Find." },
+            { icon: "3️⃣", text: "Select your name from the list and join the session." },
+            { icon: "4️⃣", text: "Pick a card to estimate the story. Your vote is hidden until SM reveals." },
+            { icon: "5️⃣", text: "After reveal, wait for SM to start the next round." },
+          ].map(({ icon, text }) => (
+            <div key={icon} style={{ display: "flex", gap: 12, marginBottom: 10, alignItems: "flex-start" }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
+              <p style={{ color: "#aaa", fontSize: 13, margin: 0, lineHeight: 1.6 }}>{text}</p>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ height: 1, background: "#1e1e30", marginBottom: 20 }} />
+
+        {/* Cards info */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 20 }}>🃏</span>
+            <h2 style={{ color: "#96CEB4", fontSize: 15, margin: 0, fontWeight: 700 }}>Story Points</h2>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {["1","2","3","5","8","13","21","Huge"].map(c => (
+              <span key={c} style={{ background: CARD_COLORS[c], color: "#1a1a2e", borderRadius: 6, padding: "4px 10px", fontSize: 13, fontWeight: 700 }}>{c}</span>
+            ))}
+          </div>
+          <p style={{ color: "#555", fontSize: 12, marginTop: 10, lineHeight: 1.6 }}>
+            Use Fibonacci numbers to estimate complexity. "Huge" means the story is too large and should be broken down.
+          </p>
+        </div>
+
+        <button style={s.btn} onClick={() => setView("role")}>← Back to Home</button>
+      </div>
+    </div>
+  );
+
+  // ══════════════════════════════════════════════════════════════
   // ROLE SELECTION
   // ══════════════════════════════════════════════════════════════
   if (view === "role") return (
@@ -306,7 +380,8 @@ export default function App() {
         <p style={s.sub}>Sprint estimation for agile teams</p>
         <button style={s.btn} onClick={() => setView("smMode")}>🎯 Scrum Master</button>
         <button style={{ ...s.btnGhost, marginTop: 12 }} onClick={() => setView("devJoin")}>👨‍💻 Developer</button>
-        <p style={{ color: "#2a2a3e", fontSize: 11, marginTop: 28 }}>Built by <span style={{ color: "#F0A500" }}>Hakan</span></p>
+        <button style={{ ...s.btnGhost, marginTop: 8, borderColor: "#1e1e30", color: "#333" }} onClick={() => setView("howTo")}>❓ How does this work?</button>
+        <p style={{ color: "#2a2a3e", fontSize: 11, marginTop: 20 }}>Built by <span style={{ color: "#F0A500" }}>Hakan</span></p>
       </div>
     </div>
   );
