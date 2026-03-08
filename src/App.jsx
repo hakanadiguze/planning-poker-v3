@@ -379,7 +379,7 @@ export default function App() {
         <h1 style={s.title}>Planning Poker</h1>
         <p style={s.sub}>Sprint estimation for agile teams</p>
         <button style={s.btn} onClick={() => setView("smMode")}>🎯 Scrum Master</button>
-        <button style={{ ...s.btnGhost, marginTop: 12 }} onClick={() => setView("devJoin")}>👨‍💻 Developer</button>
+        <button style={{ ...s.btn, marginTop: 12, background: "#45B7D1" }} onClick={() => setView("devJoin")}>👨‍💻 Developer</button>
         <button style={{ ...s.btnGhost, marginTop: 8, borderColor: "#1e1e30", color: "#333" }} onClick={() => setView("howTo")}>❓ How does this work?</button>
         <p style={{ color: "#2a2a3e", fontSize: 11, marginTop: 20 }}>Built by <span style={{ color: "#F0A500" }}>Hakan</span></p>
       </div>
