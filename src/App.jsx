@@ -34,8 +34,8 @@ const C = {
   greenLight: "#D1FAE5",
 };
 
-// ── Global styles injected once ────────────────────────────────────
-const injectStyles = () => {
+// ── Global styles — injected once at module load ──────────────────
+(() => {
   if (document.getElementById("pp-styles")) return;
   const style = document.createElement("style");
   style.id = "pp-styles";
@@ -50,7 +50,7 @@ const injectStyles = () => {
     .team-row:hover { background: ${C.tealLight} !important; }
   `;
   document.head.appendChild(style);
-};
+})();
 
 // ── Shared component styles ────────────────────────────────────────
 const s = {
@@ -147,8 +147,6 @@ function VoteCardGrid({ members, votes, revealed }) {
 
 // ── Main App ───────────────────────────────────────────────────────
 export default function App() {
-  injectStyles();
-
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [view, setView] = useState("role");
@@ -435,7 +433,7 @@ export default function App() {
       <div style={{ background: C.tealLight, borderRadius: 12, padding: "18px", marginBottom: 12, border: `1.5px solid ${C.teal}` }}>
         <p style={{ color: C.teal, fontWeight: 700, fontSize: 15, marginBottom: 4 }}>⚡ Quick Session</p>
         <p style={{ color: C.sub, fontSize: 12, marginBottom: 12 }}>Create instantly, share link, start estimating.</p>
-        <input style={s.input} placeholder="Your name" value={quickName}
+        <input style={s.input} placeholder="Your name" value={quickName} autoFocus
           onChange={e => setQuickName(e.target.value)}
           onKeyDown={e => e.key === "Enter" && quickName.trim() && handleCreateQuickSession()} />
         <button className="btn-hover" style={{ ...s.btnOrange, marginTop: 10, opacity: quickName.trim() ? 1 : 0.45 }}
