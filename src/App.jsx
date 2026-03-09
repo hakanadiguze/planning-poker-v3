@@ -44,7 +44,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
 
   // View
-  const [view, setView] = useState("role"); // role | howTo | smMode | smAuth | smDashboard | smSession | devJoin | devSession
+  const [view, setView] = useState("role"); // role | howTo | smMode | smAuth | smDashboard | smSession | devJoin | devSession | obsJoin | obsSession
 
   // SM auth
   const [authMode, setAuthMode] = useState("login");
@@ -73,6 +73,11 @@ export default function App() {
   const [devName, setDevName] = useState("");
   const [selectedCard, setSelectedCard] = useState(null);
   const [submitted, setSubmitted] = useState(false);
+
+  // Observer
+  const [obsCode, setObsCode] = useState("");
+  const [obsCodeError, setObsCodeError] = useState("");
+  const [obsTeamData, setObsTeamData] = useState(null);
 
   // ── Auth listener ─────────────────────────────────────────────
   useEffect(() => {
@@ -264,6 +269,31 @@ export default function App() {
     setSubmitted(true);
   };
 
+  // ── Observer: listen to session by code ─────────────────────
+  useEffect(() => {
+    if (view !== "obsSession" || !obsTeamData) return;
+    const unsub = onValue(ref(db, `sessions/${obsTeamData.teamId}`), (snap) => {
+      setSession(snap.val() || {});
+    });
+    return () => unsub();
+  }, [view, obsTeamData]);
+
+  // ── Observer: lookup team by code ────────────────────────────
+  const handleObsLookup = () => {
+    const code = obsCode.trim().toUpperCase();
+    if (!code) return;
+    setObsCodeError("");
+    onValue(ref(db, `codes/${code}`), (snap) => {
+      const data = snap.val();
+      if (!data) { setObsCodeError("❌ Team not found. Check the code."); return; }
+      onValue(ref(db, `teams/${data.smId}/${data.teamId}`), (teamSnap) => {
+        const team = teamSnap.val();
+        if (!team) { setObsCodeError("❌ Team not found."); return; }
+        setObsTeamData({ teamId: data.teamId, smId: data.smId, ...team });
+      }, { onlyOnce: true });
+    }, { onlyOnce: true });
+  };
+
   // ── Derived session data ───────────────────────────────────────
   const smId = getSmId();
   const liveTeamData = user
@@ -380,6 +410,7 @@ export default function App() {
         <p style={s.sub}>Sprint estimation for agile teams</p>
         <button style={s.btn} onClick={() => setView("smMode")}>🎯 Scrum Master</button>
         <button style={{ ...s.btn, marginTop: 12, background: "#45B7D1" }} onClick={() => setView("devJoin")}>👨‍💻 Developer</button>
+        <button style={{ ...s.btn, marginTop: 12, background: "#96CEB4", color: "#1a1a2e" }} onClick={() => setView("obsJoin")}>👁️ Observer</button>
         <button style={{ ...s.btnGhost, marginTop: 8, borderColor: "#1e1e30", color: "#333" }} onClick={() => setView("howTo")}>❓ How does this work?</button>
         <p style={{ color: "#2a2a3e", fontSize: 11, marginTop: 20 }}>Built by <span style={{ color: "#F0A500" }}>Hakan</span></p>
       </div>
@@ -777,12 +808,162 @@ export default function App() {
           ))}
         </div>
 
+        {/* Results for developer */}
+        {revealed && voteValues.length > 0 && (
+          <div style={{ background: "#1a1a2e", borderRadius: 14, padding: 20, marginTop: 24, textAlign: "center" }}>
+            <h3 style={{ color: "#F0A500", marginBottom: 14, fontSize: 14, letterSpacing: 1 }}>📊 RESULTS</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 16 }}>
+              {[
+                { val: mostVoted, lbl: "Most Voted" },
+                { val: highest ?? "—", lbl: `Highest` },
+                { val: lowest ?? "—", lbl: `Lowest` },
+              ].map(({ val, lbl }) => (
+                <div key={lbl} style={{ background: "#0f0f1a", borderRadius: 10, padding: "14px 8px" }}>
+                  <div style={{ color: "#F0A500", fontSize: 26, fontWeight: 800 }}>{val}</div>
+                  <div style={{ color: "#555", fontSize: 11, marginTop: 4 }}>{lbl}</div>
+                </div>
+              ))}
+            </div>
+            {Object.entries(tally).sort((a, b) => b[1] - a[1]).map(([card, count]) => (
+              <div key={card} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
+                <span style={{ background: CARD_COLORS[card] || "#555", width: 34, textAlign: "center", padding: "2px 5px", borderRadius: 5, fontSize: 12, fontWeight: 700, color: "#1a1a2e" }}>{card}</span>
+                <div style={{ flex: 1, background: "#0f0f1a", borderRadius: 4, height: 18 }}>
+                  <div style={{ width: `${(count / devMembers.length) * 100}%`, height: "100%", borderRadius: 4, background: CARD_COLORS[card] || "#555", transition: "width 0.8s ease" }} />
+                </div>
+                <span style={{ color: "#555", fontSize: 11, width: 50, textAlign: "right" }}>{count} vote{count > 1 ? "s" : ""}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         <p style={{ color: "#1a1a2e", fontSize: 11, marginTop: 32, textAlign: "center" }}>
           Built by <span style={{ color: "#2a2a3e" }}>Hakan</span>
         </p>
       </div>
     </div>
   );
+
+  // ══════════════════════════════════════════════════════════════
+  // OBSERVER JOIN
+  // ══════════════════════════════════════════════════════════════
+  if (view === "obsJoin") return (
+    <div style={s.page}>
+      <div style={s.card}>
+        <div style={{ fontSize: 36, marginBottom: 8 }}>👁️</div>
+        <h1 style={s.title}>Observer</h1>
+        <p style={s.sub}>Watch the session — no voting</p>
+
+        <div style={s.field}>
+          <label style={s.label}>TEAM CODE</label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input style={{ ...s.input, flex: 1, textTransform: "uppercase", letterSpacing: 3, fontSize: 18, textAlign: "center" }}
+              placeholder="ABC123" maxLength={6}
+              value={obsCode} onChange={e => { setObsCode(e.target.value.toUpperCase()); setObsCodeError(""); setObsTeamData(null); }}
+              onKeyDown={e => e.key === "Enter" && handleObsLookup()}
+            />
+            <button onClick={handleObsLookup} style={{ ...s.btnSmall, fontSize: 13, padding: "11px 16px" }}>Find</button>
+          </div>
+          {obsCodeError && <p style={s.error}>{obsCodeError}</p>}
+        </div>
+
+        {obsTeamData && (
+          <div style={{ background: "#0f0f1a", borderRadius: 10, padding: "14px", marginBottom: 16, textAlign: "left" }}>
+            <p style={{ color: "#06D6A0", fontSize: 12, margin: "0 0 4px" }}>✓ Team found!</p>
+            <p style={{ color: "#fff", fontWeight: 700, margin: 0 }}>{obsTeamData.name}</p>
+            <p style={{ color: "#555", fontSize: 12, margin: "2px 0 0" }}>{Object.keys(obsTeamData.members || {}).length} members</p>
+          </div>
+        )}
+
+        <button style={{ ...s.btn, background: "#96CEB4", color: "#1a1a2e", opacity: obsTeamData ? 1 : 0.4, marginTop: 8 }}
+          onClick={() => obsTeamData && setView("obsSession")} disabled={!obsTeamData}>
+          Watch Session →
+        </button>
+        <button style={s.btnGhost} onClick={() => setView("role")}>← Back</button>
+        <p style={{ color: "#2a2a3e", fontSize: 11, marginTop: 20 }}>Built by <span style={{ color: "#F0A500" }}>Hakan</span></p>
+      </div>
+    </div>
+  );
+
+  // ══════════════════════════════════════════════════════════════
+  // OBSERVER SESSION
+  // ══════════════════════════════════════════════════════════════
+  if (view === "obsSession" && obsTeamData) {
+    const obsMembers = obsTeamData?.members ? Object.keys(obsTeamData.members) : [];
+    return (
+      <div style={s.page}>
+        <div style={{ width: "100%", maxWidth: 680 }}>
+          <div style={s.header}>
+            <span style={s.badge}>👁️ Observer</span>
+            <span style={{ color: "#ccc", fontSize: 13, flex: 1, textAlign: "center" }}>📋 {story}</span>
+            <span style={s.badge}>{votedCount}/{obsMembers.length} voted</span>
+          </div>
+
+          {!revealed ? (
+            <div style={{ background: "#1a2535", color: "#45B7D1", padding: "13px 20px", borderRadius: 10, textAlign: "center", marginBottom: 24, fontSize: 14 }}>
+              ⏳ Waiting for Scrum Master to reveal votes...
+            </div>
+          ) : (
+            <div style={{ background: "#1a2e1a", color: "#06D6A0", padding: "13px 20px", borderRadius: 10, textAlign: "center", marginBottom: 24, fontSize: 14 }}>
+              🃏 Votes revealed!
+            </div>
+          )}
+
+          {/* Vote cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 14, marginBottom: 20 }}>
+            {obsMembers.map(p => (
+              <div key={p} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <div style={{
+                  width: 76, height: 106, borderRadius: 12,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 26, fontWeight: 800, border: "2px solid #1e1e30",
+                  background: revealed && votes[p] ? CARD_COLORS[votes[p]] || "#555" : "#1a1a2e",
+                  color: revealed && votes[p] ? "#1a1a2e" : "#2a2a3e",
+                  transition: "all 0.5s ease",
+                }}>
+                  {revealed && votes[p] ? votes[p] : "?"}
+                </div>
+                <span style={{ fontSize: 12, color: "#666", marginTop: 6 }}>{p}</span>
+                {votes[p] && !revealed && <span style={{ fontSize: 10, color: "#06D6A0" }}>✓ voted</span>}
+                {!votes[p] && <span style={{ fontSize: 10, color: "#EF476F" }}>waiting...</span>}
+              </div>
+            ))}
+          </div>
+
+          {/* Results */}
+          {revealed && voteValues.length > 0 && (
+            <div style={{ background: "#1a1a2e", borderRadius: 14, padding: 20, marginTop: 8, textAlign: "center" }}>
+              <h3 style={{ color: "#F0A500", marginBottom: 14, fontSize: 14, letterSpacing: 1 }}>📊 RESULTS</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 16 }}>
+                {[
+                  { val: mostVoted, lbl: "Most Voted" },
+                  { val: highest ?? "—", lbl: `Highest` },
+                  { val: lowest ?? "—", lbl: `Lowest` },
+                ].map(({ val, lbl }) => (
+                  <div key={lbl} style={{ background: "#0f0f1a", borderRadius: 10, padding: "14px 8px" }}>
+                    <div style={{ color: "#F0A500", fontSize: 26, fontWeight: 800 }}>{val}</div>
+                    <div style={{ color: "#555", fontSize: 11, marginTop: 4 }}>{lbl}</div>
+                  </div>
+                ))}
+              </div>
+              {Object.entries(tally).sort((a, b) => b[1] - a[1]).map(([card, count]) => (
+                <div key={card} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
+                  <span style={{ background: CARD_COLORS[card] || "#555", width: 34, textAlign: "center", padding: "2px 5px", borderRadius: 5, fontSize: 12, fontWeight: 700, color: "#1a1a2e" }}>{card}</span>
+                  <div style={{ flex: 1, background: "#0f0f1a", borderRadius: 4, height: 18 }}>
+                    <div style={{ width: `${(count / obsMembers.length) * 100}%`, height: "100%", borderRadius: 4, background: CARD_COLORS[card] || "#555", transition: "width 0.8s ease" }} />
+                  </div>
+                  <span style={{ color: "#555", fontSize: 11, width: 50, textAlign: "right" }}>{count} vote{count > 1 ? "s" : ""}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <p style={{ color: "#1a1a2e", fontSize: 11, marginTop: 32, textAlign: "center" }}>
+            Built by <span style={{ color: "#2a2a3e" }}>Hakan</span>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return null;
 }
