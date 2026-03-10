@@ -151,6 +151,14 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [view, setView] = useState("role");
 
+  // ── GA page tracking helper ───────────────────────────────────
+  const gotoView = (v) => {
+    setView(v);
+    if (window.gtag) {
+      window.gtag('event', 'page_view', { page_title: v, page_path: '/' + v });
+    }
+  };
+
   // SM Auth
   const [authMode, setAuthMode] = useState("login");
   const [email, setEmail] = useState(""); const [password, setPassword] = useState("");
@@ -196,7 +204,7 @@ export default function App() {
     const hash = window.location.hash;
     if (hash.startsWith("#/quick/")) {
       const id = hash.replace("#/quick/", "");
-      if (id) { setQuickSessionId(id); setView("quickJoin"); }
+      if (id) { setQuickSessionId(id); gotoView("quickJoin"); }
     }
   }, []);
 
@@ -204,7 +212,7 @@ export default function App() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u); setAuthLoading(false);
-      if (u && view === "smAuth") setView("smDashboard");
+      if (u && view === "smAuth") gotoView("smDashboard");
     });
     return () => unsub();
   }, []);
@@ -268,7 +276,7 @@ export default function App() {
     });
     setQuickSessionId(id); setQuickIsHost(true); setQuickIsObserver(false); setQuickJoinName(host);
     window.location.hash = `#/quick/${id}`;
-    setView("quickHost");
+    gotoView("quickHost");
   };
 
   const handleJoinQuickSession = async () => {
@@ -276,7 +284,7 @@ export default function App() {
     if (!name) { setQuickJoinError("Please enter your name."); return; }
     if (quickJoinRole === "observer") {
       setQuickIsObserver(true); setQuickIsHost(false);
-      setView("quickObserver"); return;
+      gotoView("quickObserver"); return;
     }
     const snap = await new Promise(res => onValue(ref(db, `quick/${quickSessionId}/participants/${name}`), res, { onlyOnce: true }));
     if (snap.val()) { setQuickJoinError("This name is already taken."); return; }
@@ -284,7 +292,7 @@ export default function App() {
     const sessSnap = await new Promise(res => onValue(ref(db, `quick/${quickSessionId}`), res, { onlyOnce: true }));
     const isHost = sessSnap.val()?.host === name;
     setQuickIsHost(isHost); setQuickIsObserver(false);
-    setView(isHost ? "quickHost" : "quickPlayer");
+    gotoView(isHost ? "quickHost" : "quickPlayer");
   };
 
   const handleQuickVote = async () => {
@@ -313,13 +321,13 @@ export default function App() {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(cred.user, { displayName: displayName.trim() });
       } else { await signInWithEmailAndPassword(auth, email, password); }
-      setView("smDashboard");
+      gotoView("smDashboard");
     } catch (e) {
       const msgs = { "auth/email-already-in-use": "Email already registered.", "auth/invalid-email": "Invalid email.", "auth/weak-password": "Min 6 characters.", "auth/invalid-credential": "Wrong email or password." };
       setAuthError(msgs[e.code] || e.message);
     }
   };
-  const handleLogout = async () => { await signOut(auth); setView("role"); setSelectedTeam(null); setMyTeams({}); setSession({}); };
+  const handleLogout = async () => { await signOut(auth); gotoView("role"); setSelectedTeam(null); setMyTeams({}); setSession({}); };
   const getSmId = () => user ? user.uid : `guest_${guestName.trim().replace(/\s/g, "_")}`;
   const getSmLabel = () => user ? (user.displayName || user.email) : guestName;
   const handleCreateTeam = async () => {
@@ -335,7 +343,7 @@ export default function App() {
     if (code) await remove(ref(db, `codes/${code}`));
   };
   const handleSelectTeam = (tid, td) => {
-    setSelectedTeam({ id: tid, ...td }); setView("smSession");
+    setSelectedTeam({ id: tid, ...td }); gotoView("smSession");
     onValue(ref(db, `sessions/${tid}/revealed`), snap => {
       if (snap.val() === null) { set(ref(db, `sessions/${tid}/revealed`), false); set(ref(db, `sessions/${tid}/story`), "What are we estimating?"); }
     }, { onlyOnce: true });
@@ -442,8 +450,8 @@ export default function App() {
         </button>
       </div>
 
-      <button className="btn-hover" style={s.btnOutline} onClick={() => setView("teamMode")}>👥 Team Session (Advanced)</button>
-      <button className="btn-hover" style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => setView("howTo")}>❓ How does this work?</button>
+      <button className="btn-hover" style={s.btnOutline} onClick={() => gotoView("teamMode")}>👥 Team Session (Advanced)</button>
+      <button className="btn-hover" style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => gotoView("howTo")}>❓ How does this work?</button>
     </Page>
   );
 
@@ -492,7 +500,7 @@ export default function App() {
         Join Session →
       </button>
       <button className="btn-hover" style={{ ...s.btnGhost, marginTop: 8 }}
-        onClick={() => { window.location.hash = ""; setView("role"); }}>← Home</button>
+        onClick={() => { window.location.hash = ""; gotoView("role"); }}>← Home</button>
     </Page>
   );
 
@@ -713,10 +721,10 @@ export default function App() {
         <h1 style={{ ...s.pageTitle, fontSize: 22 }}>Team Session</h1>
         <p style={{ ...s.body, marginTop: 4 }}>Permanent teams, recurring sprints</p>
       </div>
-      <button className="btn-hover" style={s.btnPrimary} onClick={() => setView("smMode")}>🎯 Scrum Master</button>
-      <button className="btn-hover" style={{ ...s.btnOutline, marginTop: 10 }} onClick={() => setView("devJoin")}>👨‍💻 Developer</button>
-      <button className="btn-hover" style={{ ...s.btnGhost, marginTop: 8, color: "#7C3AED", borderColor: "#DDD6FE" }} onClick={() => setView("obsJoin")}>👁️ Observer</button>
-      <button className="btn-hover" style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => setView("role")}>← Back</button>
+      <button className="btn-hover" style={s.btnPrimary} onClick={() => gotoView("smMode")}>🎯 Scrum Master</button>
+      <button className="btn-hover" style={{ ...s.btnOutline, marginTop: 10 }} onClick={() => gotoView("devJoin")}>👨‍💻 Developer</button>
+      <button className="btn-hover" style={{ ...s.btnGhost, marginTop: 8, color: "#7C3AED", borderColor: "#DDD6FE" }} onClick={() => gotoView("obsJoin")}>👁️ Observer</button>
+      <button className="btn-hover" style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => gotoView("role")}>← Back</button>
     </Page>
   );
 
@@ -756,7 +764,7 @@ export default function App() {
           <p style={{ color: C.sub, fontSize: 12 }}><strong>Huge</strong> = too big, break it down. <strong style={{ color: "#6366F1" }}>?</strong> = unsure, needs discussion.</p>
         </div>
 
-        <button className="btn-hover" style={s.btnPrimary} onClick={() => setView("role")}>← Back to Home</button>
+        <button className="btn-hover" style={s.btnPrimary} onClick={() => gotoView("role")}>← Back to Home</button>
       </div>
     </div>
   );
@@ -775,18 +783,18 @@ export default function App() {
         <p style={{ color: C.sub, fontSize: 12, marginBottom: 10 }}>Quick access. Teams lost on browser close.</p>
         <input style={s.input} placeholder="Your name" value={guestName}
           onChange={e => setGuestName(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && guestName.trim() && setView("smDashboard")} />
+          onKeyDown={e => e.key === "Enter" && guestName.trim() && gotoView("smDashboard")} />
         <button className="btn-hover" style={{ ...s.btnOrange, marginTop: 10, opacity: guestName.trim() ? 1 : 0.4 }}
-          onClick={() => guestName.trim() && setView("smDashboard")} disabled={!guestName.trim()}>
+          onClick={() => guestName.trim() && gotoView("smDashboard")} disabled={!guestName.trim()}>
           Continue as Guest →
         </button>
       </div>
       <div style={s.innerBox}>
         <p style={{ color: C.text, fontWeight: 700, marginBottom: 4 }}>🔐 Account</p>
         <p style={{ color: C.sub, fontSize: 12, marginBottom: 10 }}>Teams saved permanently.</p>
-        <button className="btn-hover" style={s.btnPrimary} onClick={() => setView("smAuth")}>Sign In / Register →</button>
+        <button className="btn-hover" style={s.btnPrimary} onClick={() => gotoView("smAuth")}>Sign In / Register →</button>
       </div>
-      <button className="btn-hover" style={{ ...s.btnGhost, marginTop: 10 }} onClick={() => setView("teamMode")}>← Back</button>
+      <button className="btn-hover" style={{ ...s.btnGhost, marginTop: 10 }} onClick={() => gotoView("teamMode")}>← Back</button>
     </Page>
   );
 
@@ -815,7 +823,7 @@ export default function App() {
       <input style={{ ...s.input, marginBottom: 6 }} type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && handleAuth()} />
       {authError && <p style={s.error}>❌ {authError}</p>}
       <button className="btn-hover" style={{ ...s.btnPrimary, marginTop: 10 }} onClick={handleAuth}>{authMode === "login" ? "Sign In →" : "Create Account →"}</button>
-      <button className="btn-hover" style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => setView("smMode")}>← Back</button>
+      <button className="btn-hover" style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => gotoView("smMode")}>← Back</button>
     </Page>
   );
 
@@ -829,7 +837,7 @@ export default function App() {
         <h1 style={{ ...s.pageTitle, fontSize: 20 }}>My Teams</h1>
         {user
           ? <button className="btn-hover" onClick={handleLogout} style={{ background: "transparent", border: `1px solid ${C.border2}`, color: C.sub, borderRadius: 8, padding: "5px 12px", cursor: "pointer", fontSize: 12 }}>Sign Out</button>
-          : <button className="btn-hover" onClick={() => setView("teamMode")} style={{ background: "transparent", border: `1px solid ${C.border2}`, color: C.sub, borderRadius: 8, padding: "5px 12px", cursor: "pointer", fontSize: 12 }}>Exit</button>
+          : <button className="btn-hover" onClick={() => gotoView("teamMode")} style={{ background: "transparent", border: `1px solid ${C.border2}`, color: C.sub, borderRadius: 8, padding: "5px 12px", cursor: "pointer", fontSize: 12 }}>Exit</button>
         }
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
@@ -864,7 +872,7 @@ export default function App() {
   if (view === "smSession" && selectedTeam) return (
     <SessionPage>
       <TopBar
-        left={<button onClick={() => setView("smDashboard")} style={{ background: "transparent", border: "none", color: C.teal, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>← Teams</button>}
+        left={<button onClick={() => gotoView("smDashboard")} style={{ background: "transparent", border: "none", color: C.teal, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>← Teams</button>}
         center={editingStory
           ? <input autoFocus style={{ ...s.input, fontSize: 13, padding: "6px 10px" }} value={storyDraft} onChange={e => setStoryDraft(e.target.value)}
               onBlur={() => { update(ref(db, `sessions/${selectedTeam.id}`), { story: storyDraft }); setEditingStory(false); }}
@@ -968,9 +976,9 @@ export default function App() {
           onValue(ref(db, `sessions/${devTeamData.teamId}/revealed`), snap => {
             if (snap.val() === null) { set(ref(db, `sessions/${devTeamData.teamId}/revealed`), false); set(ref(db, `sessions/${devTeamData.teamId}/story`), "What are we estimating?"); }
           }, { onlyOnce: true });
-          setView("devSession");
+          gotoView("devSession");
         }} disabled={!devTeamData || !devName}>Join Session →</button>
-      <button className="btn-hover" style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => setView("teamMode")}>← Back</button>
+      <button className="btn-hover" style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => gotoView("teamMode")}>← Back</button>
     </Page>
   );
 
@@ -1068,8 +1076,8 @@ export default function App() {
         </div>
       )}
       <button className="btn-hover" style={{ ...s.btnPrimary, marginTop: 12, background: "#7C3AED", opacity: obsTeamData ? 1 : 0.4 }}
-        onClick={() => obsTeamData && setView("obsSession")} disabled={!obsTeamData}>Watch Session →</button>
-      <button className="btn-hover" style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => setView("teamMode")}>← Back</button>
+        onClick={() => obsTeamData && gotoView("obsSession")} disabled={!obsTeamData}>Watch Session →</button>
+      <button className="btn-hover" style={{ ...s.btnGhost, marginTop: 8 }} onClick={() => gotoView("teamMode")}>← Back</button>
     </Page>
   );
 
